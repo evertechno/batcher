@@ -33,6 +33,13 @@ with st.sidebar:
         help="Number of records to fetch"
     )
     
+    # Auth header type
+    auth_type = st.selectbox(
+        "Authorization Type",
+        ["All (Recommended)", "Bearer Token", "x-api-key", "apikey"],
+        help="Select the authorization header format"
+    )
+    
     # Fetch button
     fetch_data = st.button("🔄 Fetch Data", type="primary", use_container_width=True)
 
@@ -52,10 +59,25 @@ try:
                 "limit": limit
             }
             
-            # Set up headers
-            headers = {
-                "x-api-key": api_key
-            }
+            # Set up headers based on auth type
+            if auth_type == "All (Recommended)":
+                headers = {
+                    "x-api-key": api_key,
+                    "Authorization": f"Bearer {api_key}",
+                    "apikey": api_key
+                }
+            elif auth_type == "Bearer Token":
+                headers = {
+                    "Authorization": f"Bearer {api_key}"
+                }
+            elif auth_type == "x-api-key":
+                headers = {
+                    "x-api-key": api_key
+                }
+            else:  # apikey
+                headers = {
+                    "apikey": api_key
+                }
             
             # Make the GET request
             response = requests.get(url, params=params, headers=headers)
