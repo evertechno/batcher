@@ -5,48 +5,54 @@ import pandas as pd
 st.set_page_config(page_title="Lens Data Viewer", layout="wide")
 
 # -----------------------
-# Load API Key from st.secrets
+# Load secrets
 # -----------------------
-API_KEY = st.secrets.get("API_KEY", None)
+API_KEY = st.secrets.get("API_KEY")  # your x-api-key
+SUPABASE_SERVICE_KEY = st.secrets.get("SUPABASE_SERVICE_KEY")  # needed for Authorization
 
-if not API_KEY:
-    st.error("API_KEY not found in st.secrets. Please add it before running the app.")
+if not API_KEY or not SUPABASE_SERVICE_KEY:
+    st.error("Missing API_KEY or SUPABASE_SERVICE_KEY in st.secrets.")
     st.stop()
 
 # -----------------------
-# Streamlit UI
+# Endpoint
 # -----------------------
-st.title("🔍 Lens Data Viewer")
-st.caption("Fetch data from Supabase Edge Function using API key from st.secrets")
+ENDPOINT = "https://lbtoopahmulfgffzjumy.supabase.co/functions/v1/lens-data"
+
+# -----------------------
+# UI
+# -----------------------
+st.title("🔍 Lens Data Viewer (Supabase Edge Function)")
+st.caption("Reads API keys from st.secrets")
 
 table_name = st.text_input("Table name", value="aspirex_conversations")
 limit = st.number_input("Limit", min_value=1, max_value=1000, value=10, step=1)
 
-endpoint = f"https://lbtoopahmulfgffzjumy.supabase.co/functions/v1/lens-data"
-
 if st.button("Fetch Data"):
     with st.spinner("Fetching data..."):
-        try:
-            # Prepare request
-            url = f"{endpoint}?table={table_name}&limit={limit}"
-            headers = {"x-api-key": API_KEY}
 
-            # Call Edge Function
+        url = f"{ENDPOINT}?table={table_name}&limit={limit}"
+
+        headers = {
+            "x-api-key": API_KEY,
+            "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+            "Content-Type": "application/json",
+        }
+
+        try:
             response = requests.get(url, headers=headers)
 
             if response.status_code != 200:
-                st.error(f"Error: {response.status_code} - {response.text}")
+                st.error(f"Error {response.status_code}: {response.text}")
             else:
                 data = response.json()
 
-                # Render data
                 if isinstance(data, list):
                     df = pd.DataFrame(data)
-                    st.success("Data fetched successfully!")
+                    st.success(f"Fetched {len(df)} rows.")
                     st.dataframe(df, use_container_width=True)
                 else:
-                    st.write("Response:")
                     st.json(data)
 
         except Exception as e:
-            st.error(f"Unexpected error: {e}")
+            st.error(f"Error: {e}")
