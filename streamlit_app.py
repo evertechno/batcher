@@ -1,67 +1,151 @@
 import streamlit as st
+import requests
 import pandas as pd
-import os
-import zipfile
-import tempfile
-from datetime import datetime
+import json
 
-BATCH_SIZE = 5000
+# Page configuration
+st.set_page_config(
+    page_title="Lens Data Viewer",
+    page_icon="🔍",
+    layout="wide"
+)
 
-st.set_page_config(page_title="Email Batcher", layout="centered")
+st.title("🔍 Supabase Lens Data Viewer")
+st.markdown("View data from your Supabase lens-data function")
 
-st.title("📧 Email ID Batcher")
-st.write("Upload a CSV file with a column of email IDs. This app will split them into batches of 5,000 and provide a ZIP file with `.txt` files.")
+# Sidebar for configuration
+with st.sidebar:
+    st.header("⚙️ Configuration")
+    
+    # Table name input
+    table_name = st.text_input(
+        "Table Name",
+        value="aspirex_conversations",
+        help="Name of the table to query"
+    )
+    
+    # Limit input
+    limit = st.number_input(
+        "Limit",
+        min_value=1,
+        max_value=1000,
+        value=10,
+        help="Number of records to fetch"
+    )
+    
+    # Fetch button
+    fetch_data = st.button("🔄 Fetch Data", type="primary", use_container_width=True)
 
-uploaded_file = st.file_uploader("Upload your CSV file", type=['csv'])
+# Main content area
+try:
+    # Get API key from secrets
+    api_key = st.secrets["api_key"]
+    
+    if fetch_data:
+        with st.spinner("Fetching data..."):
+            # Construct the URL
+            url = f"https://lbtoopahmulfgffzjumy.supabase.co/functions/v1/lens-data"
+            
+            # Set up parameters
+            params = {
+                "table": table_name,
+                "limit": limit
+            }
+            
+            # Set up headers
+            headers = {
+                "x-api-key": api_key
+            }
+            
+            # Make the GET request
+            response = requests.get(url, params=params, headers=headers)
+            
+            # Check if request was successful
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Display success message
+                st.success(f"✅ Successfully fetched data from {table_name}")
+                
+                # Create tabs for different views
+                tab1, tab2, tab3 = st.tabs(["📊 Table View", "📄 JSON View", "📈 Stats"])
+                
+                with tab1:
+                    if isinstance(data, list) and len(data) > 0:
+                        # Convert to DataFrame for better display
+                        df = pd.DataFrame(data)
+                        st.dataframe(df, use_container_width=True, height=500)
+                        
+                        # Download button
+                        csv = df.to_csv(index=False)
+                        st.download_button(
+                            label="📥 Download as CSV",
+                            data=csv,
+                            file_name=f"{table_name}_data.csv",
+                            mime="text/csv"
+                        )
+                    elif isinstance(data, list):
+                        st.info("No data returned from the query.")
+                    else:
+                        st.write(data)
+                
+                with tab2:
+                    st.json(data)
+                    
+                    # Copy button for JSON
+                    st.download_button(
+                        label="📥 Download as JSON",
+                        data=json.dumps(data, indent=2),
+                        file_name=f"{table_name}_data.json",
+                        mime="application/json"
+                    )
+                
+                with tab3:
+                    if isinstance(data, list) and len(data) > 0:
+                        col1, col2, col3 = st.columns(3)
+                        
+                        with col1:
+                            st.metric("Total Records", len(data))
+                        
+                        with col2:
+                            st.metric("Fields", len(data[0].keys()) if data else 0)
+                        
+                        with col3:
+                            st.metric("Table", table_name)
+                        
+                        # Show field names
+                        st.subheader("Available Fields")
+                        if data:
+                            st.write(", ".join(data[0].keys()))
+                    else:
+                        st.info("No statistics available for empty dataset.")
+            
+            else:
+                st.error(f"❌ Error: {response.status_code}")
+                st.code(response.text)
+                
+except KeyError:
+    st.error("🔑 API key not found in secrets!")
+    st.info("""
+    Please add your API key to Streamlit secrets:
+    
+    **Local development:**
+    Create a file `.streamlit/secrets.toml` with:
+    ```toml
+    api_key = "your_api_key_here"
+    ```
+    
+    **Streamlit Cloud:**
+    Go to your app settings → Secrets and add:
+    ```toml
+    api_key = "your_api_key_here"
+    ```
+    """)
+    
+except Exception as e:
+    st.error(f"❌ An error occurred: {str(e)}")
+    st.exception(e)
 
-def process_emails(file):
-    try:
-        df = pd.read_csv(file)
-        email_col = None
-
-        # Try to auto-detect email column
-        for col in df.columns:
-            if 'email' in col.lower():
-                email_col = col
-                break
-
-        if email_col is None:
-            st.error("Could not detect an email column. Please ensure the CSV has a column with email addresses.")
-            return
-
-        emails = df[email_col].dropna().unique()
-
-        if len(emails) == 0:
-            st.warning("No valid email IDs found.")
-            return
-
-        total_batches = (len(emails) + BATCH_SIZE - 1) // BATCH_SIZE
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            txt_files = []
-
-            for i in range(total_batches):
-                batch = emails[i * BATCH_SIZE: (i + 1) * BATCH_SIZE]
-                batch_file_path = os.path.join(tmpdir, f"emails_batch_{i+1}.txt")
-                with open(batch_file_path, "w") as f:
-                    f.write("\n".join(batch))
-                txt_files.append(batch_file_path)
-
-            zip_filename = os.path.join(tmpdir, f"email_batches_{datetime.now().strftime('%Y%m%d%H%M%S')}.zip")
-            with zipfile.ZipFile(zip_filename, 'w') as zipf:
-                for file_path in txt_files:
-                    zipf.write(file_path, os.path.basename(file_path))
-
-            with open(zip_filename, "rb") as f:
-                st.success(f"Processed {len(emails)} emails into {total_batches} batches.")
-                st.download_button(
-                    label="📦 Download ZIP of Batches",
-                    data=f,
-                    file_name="email_batches.zip",
-                    mime="application/zip"
-                )
-    except Exception as e:
-        st.error(f"Error processing file: {e}")
-
-if uploaded_file:
-    process_emails(uploaded_file)
+# Footer
+st.markdown("---")
+st.markdown("Built with Streamlit 🎈")
