@@ -14,7 +14,7 @@ if not API_KEY or not SUPABASE_ANON_KEY:
     st.error("Missing LENS_API_KEY or SUPABASE_ANON_KEY in st.secrets")
     st.stop()
 
-ENDPOINT = "https://lbtoopahmulfgffzjumy.supabase.co/functions/v1/lens-api"
+ENDPOINT = "https://lbtoopahmulfgffzjumy.supabase.co/functions/v1/lens-data"
 
 # -----------------------
 # UI
