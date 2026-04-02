@@ -42,7 +42,7 @@ params = {"limit": limit}
 if search:
     params["search"] = search
 
-if endpoint in ["circulars", "invector_json", "regulatory_benchmarks"]:
+if endpoint in ["circulars", "invector_json", "invision_intel","regulatory_benchmarks"]:
     all_src = CIRCULAR_SOURCES + RSS_SOURCES if endpoint == "circulars" else CIRCULAR_SOURCES
     selected_source = st.sidebar.selectbox("Source Regulator", ["all"] + all_src)
     if selected_source != "all":
