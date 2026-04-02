@@ -25,9 +25,10 @@ RSS_SOURCES = ['boj', 'eiopa', 'bis']
 
 # --- UI Sidebar ---
 st.sidebar.header("🛠️ API Configuration")
+# Added 'invision_intel' to the selectbox options
 endpoint = st.sidebar.selectbox(
     "Select Endpoint",
-    ["circulars", "invector_json", "ai_analyzed_datasets", "regulatory_benchmarks", "sources"]
+    ["circulars", "invector_json", "invision_intel", "ai_analyzed_datasets", "regulatory_benchmarks", "sources"]
 )
 
 st.sidebar.divider()
@@ -42,7 +43,8 @@ params = {"limit": limit}
 if search:
     params["search"] = search
 
-if endpoint in ["circulars", "invector_json", "invision_intel","regulatory_benchmarks"]:
+# Logic updated to include 'invision_intel' for source filtering
+if endpoint in ["circulars", "invector_json", "invision_intel", "regulatory_benchmarks"]:
     all_src = CIRCULAR_SOURCES + RSS_SOURCES if endpoint == "circulars" else CIRCULAR_SOURCES
     selected_source = st.sidebar.selectbox("Source Regulator", ["all"] + all_src)
     if selected_source != "all":
@@ -71,7 +73,7 @@ if st.button("Run Query", type="primary"):
         "Content-Type": "application/json",
     }
 
-    with st.spinner("Fetching data from Lens API..."):
+    with st.spinner(f"Fetching data from {endpoint}..."):
         try:
             # Construct final URL
             target_url = f"{BASE_URL}/{endpoint}" if endpoint != "circulars" else f"{BASE_URL}/circulars"
@@ -124,4 +126,4 @@ if not st.session_state.get('run_query'):
         """)
 
 st.divider()
-st.info("💡 Tip: Use the 'Search' filter in the sidebar to look for specific keywords in circular titles.")
+st.info("💡 Tip: Use the 'Search' filter in the sidebar to look for specific keywords.")
